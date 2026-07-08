@@ -72,13 +72,27 @@ Yes. After reviewing the skeleton with my AI assistant, I made three changes:
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers three constraints: available time (the owner's daily
+time budget), task priority (high/medium/low), and whether a task is due today
+(completion status + recurrence). Priority matters most — tasks are sorted
+high-to-low and placed greedily — because a busy owner most wants to guarantee
+the important care happens (a walk, medication) even if lower-value tasks like
+grooming get dropped when time runs short.
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+My conflict detection only flags tasks that share the exact same
+`preferred_time` (an exact string match on "HH:MM"). It does not consider a
+task's duration, so two tasks that overlap in real time — for example a
+30-minute task at 08:00 and another at 08:15 — are not reported as
+conflicting, even though they physically overlap.
+
+This is a reasonable tradeoff for this scenario because the detection stays
+lightweight and predictable: it never blocks or crashes the schedule, it just
+returns a warning string the UI can show. A busy pet owner mainly needs a
+quick heads-up that they double-booked a slot, not a full calendar-style
+overlap solver. If the app grew, I would upgrade it to compare start time +
+duration ranges for true overlap detection.
 
 ---
 

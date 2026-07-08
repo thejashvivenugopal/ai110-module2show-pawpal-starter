@@ -10,6 +10,8 @@ classDiagram
         +remove_pet(pet) None
         +set_time_budget(minutes) None
         +get_pets() list~Pet~
+        +get_all_tasks() list~Task~
+        +get_tasks_for_pet(pet_name) list~Task~
     }
 
     class Pet {
@@ -21,6 +23,7 @@ classDiagram
         +edit_task(task_id, **fields) None
         +remove_task(task_id) None
         +get_tasks() list~Task~
+        +mark_task_complete(task_id) Task
     }
 
     class Task {
@@ -31,8 +34,12 @@ classDiagram
         +str preferred_time
         +str recurrence
         +str category
+        +bool completed
+        +date due_date
         +priority_score() int
         +is_due_today() bool
+        +mark_complete(done) None
+        +next_occurrence() Task
         +update(**fields) None
     }
 
@@ -40,9 +47,12 @@ classDiagram
         +int time_budget
         +str strategy
         +sort_tasks(tasks) list~Task~
+        +sort_by_time(tasks) list~Task~
         +filter_by_time(tasks) list~Task~
-        +resolve_conflicts(tasks) list~Task~
+        +filter_by_status(tasks, completed) list~Task~
+        +detect_conflicts(tasks) list~str~
         +generate_plan(tasks) DailyPlan
+        +plan_for_owner(owner) DailyPlan
         +for_owner(owner, strategy) Scheduler
     }
 

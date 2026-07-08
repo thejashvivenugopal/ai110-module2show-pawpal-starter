@@ -62,7 +62,26 @@ Skipped:
   Grooming — not enough time left in budget
 
 Total time used: 70 min
-Reasoning: Scheduled 4 of 5 due task(s) by priority within a 90-minute budget; 70 min used.
+Reasoning: Scheduled 4 of 5 due task(s) by priority within a 90-minute budget; 70 min used. Time conflicts: Conflict at 09:00: Breakfast, Feed Miso.
+
+--------------------------------------------
+Tasks sorted by time:
+  08:00 — Morning walk
+  09:00 — Breakfast
+  09:00 — Feed Miso
+  17:00 — Grooming
+  18:00 — Play/enrichment
+
+Pending (not completed) tasks: 5
+Biscuit's tasks only: Grooming, Morning walk, Breakfast
+
+--------------------------------------------
+Schedule conflicts detected:
+  ⚠️  Conflict at 09:00: Breakfast, Feed Miso
+
+--------------------------------------------
+Completed 'Morning walk' (daily). Tasks: 3 -> 4
+  Next occurrence queued for: 2026-07-08
 ```
 
 ## 🧪 Testing PawPal+
@@ -78,19 +97,23 @@ pytest --cov
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.14.0, pytest-9.1.1, pluggy-1.6.0
+collected 7 items
+
+tests/test_pawpal.py .......                                             [100%]
+
+============================== 7 passed in 0.01s ===============================
 ```
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_tasks()`, `Scheduler.sort_by_time()` | Sort by priority (then shorter duration), or chronologically by `preferred_time` ("HH:MM") |
+| Filtering | `Scheduler.filter_by_status()`, `Scheduler.filter_by_time()`, `Owner.get_tasks_for_pet()` | Filter by completion status, by time budget, or by pet name |
+| Conflict handling | `Scheduler.detect_conflicts()` | Lightweight exact-time-match detection; returns warning strings instead of crashing |
+| Recurring tasks | `Task.next_occurrence()`, `Pet.mark_task_complete()` | Completing a daily/weekly task auto-queues the next occurrence via `timedelta` |
 
 ## 📸 Demo Walkthrough
 

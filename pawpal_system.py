@@ -13,6 +13,10 @@ can be unit-tested in isolation.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, timedelta
+
+# How many days forward each recurrence frequency repeats.
+RECURRENCE_DAYS = {"daily": 1, "weekly": 7}
 
 # Numeric weight for each priority level (higher = more important).
 PRIORITY_WEIGHTS = {"high": 3, "medium": 2, "low": 1}
@@ -39,6 +43,7 @@ class Task:
     preferred_time: str | None = None  # optional "HH:MM"
     recurrence: str | None = None  # frequency: "daily" | "weekly" | None
     category: str | None = None  # walk / feeding / meds / grooming / ...
+    due_date: date | None = None  # the day this task is scheduled for
 
     def priority_score(self) -> int:
         """Return a sortable numeric score for this task's priority."""
@@ -58,6 +63,27 @@ class Task:
     def mark_complete(self, done: bool = True) -> None:
         """Set the task's completion status."""
         self.completed = done
+
+    def next_occurrence(self) -> "Task | None":
+        """Return a fresh copy of this task due on its next recurrence date.
+
+        Daily tasks repeat the following day and weekly tasks a week later
+        (computed with timedelta). Returns None for one-off (non-recurring)
+        tasks.
+        """
+        step = RECURRENCE_DAYS.get(self.recurrence or "")
+        if step is None:
+            return None
+        base = self.due_date or date.today()
+        return Task(
+            name=self.name,
+            duration=self.duration,
+            priority=self.priority,
+            preferred_time=self.preferred_time,
+            recurrence=self.recurrence,
+            category=self.category,
+            due_date=base + timedelta(days=step),
+        )
 
     def update(self, **fields) -> None:
         """Update one or more attributes of this task."""
@@ -109,6 +135,21 @@ class Pet:
         """Return all tasks for this pet."""
         return list(self.tasks)
 
+    def mark_task_complete(self, task_id: int) -> Task | None:
+        """Complete a task and, if it recurs, queue its next occurrence.
+
+        Returns the newly created follow-up task (added to this pet), or
+        None if the completed task was a one-off.
+        """
+        task = self._find_task(task_id)
+        if task is None:
+            raise KeyError(f"No task with id {task_id}")
+        task.mark_complete()
+        follow_up = task.next_occurrence()
+        if follow_up is not None:
+            self.add_task(follow_up)
+        return follow_up
+
 
 @dataclass
 class Owner:
@@ -143,6 +184,15 @@ class Owner:
         know about the Owner -> Pet -> Task structure itself.
         """
         return [task for pet in self.pets for task in pet.get_tasks()]
+
+    def get_tasks_for_pet(self, pet_name: str) -> list[Task]:
+        """Return all tasks belonging to pets with the given name."""
+        return [
+            task
+            for pet in self.pets
+            if pet.name == pet_name
+            for task in pet.get_tasks()
+        ]
 
 
 @dataclass
@@ -205,6 +255,37 @@ class Scheduler:
         """
         return cls(owner.daily_time_budget, strategy)
 
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Order tasks chronologically by their preferred "HH:MM" time.
+
+        Zero-padded "HH:MM" strings sort correctly with a plain lambda key;
+        tasks without a preferred time fall to the end via a "99:99" sentinel.
+        """
+        return sorted(tasks, key=lambda t: t.preferred_time or "99:99")
+
+    def filter_by_status(self, tasks: list[Task], completed: bool = False) -> list[Task]:
+        """Return only the tasks whose completion status matches ``completed``."""
+        return [t for t in tasks if t.completed == completed]
+
+    def detect_conflicts(self, tasks: list[Task]) -> list[str]:
+        """Return warning strings for tasks sharing the same preferred time.
+
+        Lightweight, exact-match detection: it groups tasks by their
+        ``preferred_time`` and warns when a slot has more than one task,
+        rather than raising or blocking the schedule.
+        """
+        by_time: dict[str, list[Task]] = {}
+        for task in tasks:
+            if task.preferred_time:
+                by_time.setdefault(task.preferred_time, []).append(task)
+
+        warnings: list[str] = []
+        for slot, group in sorted(by_time.items()):
+            if len(group) > 1:
+                names = ", ".join(t.name for t in group)
+                warnings.append(f"Conflict at {slot}: {names}")
+        return warnings
+
     def sort_tasks(self, tasks: list[Task]) -> list[Task]:
         """Order tasks by priority (desc), tie-breaking by shorter duration.
 
@@ -226,35 +307,14 @@ class Scheduler:
                 remaining -= task.duration
         return kept
 
-    def resolve_conflicts(self, tasks: list[Task]) -> list[Task]:
-        """Resolve tasks competing for the same preferred time slot.
-
-        When two tasks request the same ``preferred_time``, the higher-
-        priority one keeps the slot and the others fall back to automatic
-        placement (their ``preferred_time`` is cleared).
-        """
-        claimed: dict[str, Task] = {}
-        for task in tasks:
-            slot = task.preferred_time
-            if slot is None:
-                continue
-            holder = claimed.get(slot)
-            if holder is None:
-                claimed[slot] = task
-            elif task.priority_score() > holder.priority_score():
-                holder.preferred_time = None
-                claimed[slot] = task
-            else:
-                task.preferred_time = None
-        return tasks
-
     def generate_plan(self, tasks: list[Task]) -> DailyPlan:
         """Main entry point: produce a DailyPlan from a list of tasks.
 
-        Steps: drop tasks that aren't due today, resolve time conflicts,
-        sort by priority, then greedily schedule until the time budget runs
-        out. Populates the plan's ``reasoning`` field so the plan owns its
-        own explanation and the scheduler stays stateless.
+        Steps: drop tasks that aren't due today, flag any preferred-time
+        conflicts, sort by priority, then greedily schedule until the time
+        budget runs out. Populates the plan's ``reasoning`` field so the plan
+        owns its own explanation and the scheduler stays stateless (it never
+        mutates the tasks it is given).
         """
         plan = DailyPlan()
 
@@ -267,8 +327,9 @@ class Scheduler:
             else:
                 due.append(task)
 
-        # 2. Resolve preferred-time conflicts, then order by priority.
-        self.resolve_conflicts(due)
+        # 2. Flag (don't silently resolve) preferred-time conflicts, then
+        #    order by priority.
+        conflicts = self.detect_conflicts(due)
         ordered = self.sort_tasks(due)
 
         # 3. Greedily place tasks until the budget is exhausted.
@@ -284,12 +345,14 @@ class Scheduler:
             else:
                 plan.add_skipped(task, "not enough time left in budget")
 
-        # 4. Explain the outcome.
+        # 4. Explain the outcome, noting any time conflicts we detected.
         plan.reasoning = (
             f"Scheduled {scheduled_count} of {len(due)} due task(s) "
             f"by priority within a {self.time_budget}-minute budget; "
             f"{self.time_budget - remaining} min used."
         )
+        if conflicts:
+            plan.reasoning += " Time conflicts: " + "; ".join(conflicts) + "."
         return plan
 
     def plan_for_owner(self, owner: Owner) -> DailyPlan:
