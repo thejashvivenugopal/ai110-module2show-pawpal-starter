@@ -95,3 +95,81 @@ def test_owner_get_all_tasks_aggregates_across_pets():
 
     assert len(owner.get_all_tasks()) == 2
     assert len(owner.get_tasks_for_pet("Biscuit")) == 1
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+def test_pet_with_no_tasks_produces_empty_plan():
+    """A pet (and owner) with no tasks yields an empty, non-crashing plan."""
+    owner = Owner(name="Alex", daily_time_budget=60)
+    owner.add_pet(Pet(name="Biscuit", species="dog"))
+
+    plan = Scheduler.for_owner(owner).plan_for_owner(owner)
+
+    assert plan.scheduled_tasks == []
+    assert plan.skipped_tasks == []
+    assert plan.total_time_used == 0
+
+
+def test_scheduler_skips_tasks_that_exceed_budget():
+    """Tasks that don't fit the time budget are skipped, not scheduled."""
+    scheduler = Scheduler(time_budget=30)
+    tasks = [
+        Task(name="Short walk", duration=20, priority="high"),
+        Task(name="Long groom", duration=40, priority="high"),  # too big
+    ]
+
+    plan = scheduler.generate_plan(tasks)
+
+    scheduled_names = [t.name for t, _ in plan.scheduled_tasks]
+    skipped_names = [t.name for t, _ in plan.skipped_tasks]
+    assert scheduled_names == ["Short walk"]
+    assert "Long groom" in skipped_names
+
+
+def test_detect_conflicts_empty_when_no_overlap():
+    """detect_conflicts() returns no warnings when all times differ."""
+    scheduler = Scheduler(time_budget=120)
+    tasks = [
+        Task(name="A", duration=10, priority="low", preferred_time="08:00"),
+        Task(name="B", duration=10, priority="low", preferred_time="09:00"),
+    ]
+
+    assert scheduler.detect_conflicts(tasks) == []
+
+
+def test_completed_task_is_not_due_today():
+    """A completed task is excluded from today's plan."""
+    task = Task(name="Walk", duration=20, priority="high", recurrence="daily")
+    assert task.is_due_today() is True
+
+    task.mark_complete()
+
+    assert task.is_due_today() is False
+
+
+def test_completing_weekly_task_queues_next_week():
+    """Completing a weekly task queues a follow-up seven days later."""
+    pet = Pet(name="Miso", species="cat")
+    groom = pet.add_task(
+        Task(name="Groom", duration=15, priority="low",
+             recurrence="weekly", due_date=date.today())
+    )
+
+    follow_up = pet.mark_task_complete(groom.id)
+
+    assert follow_up is not None
+    assert follow_up.due_date == date.today() + timedelta(days=7)
+
+
+def test_completing_one_off_task_queues_nothing():
+    """Completing a non-recurring task does not create a follow-up."""
+    pet = Pet(name="Biscuit", species="dog")
+    vet = pet.add_task(Task(name="Vet visit", duration=60, priority="high"))
+
+    follow_up = pet.mark_task_complete(vet.id)
+
+    assert follow_up is None
+    assert len(pet.get_tasks()) == 1

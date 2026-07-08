@@ -86,25 +86,43 @@ Completed 'Morning walk' (daily). Tasks: 3 -> 4
 
 ## 🧪 Testing PawPal+
 
+Run the full automated test suite with:
+
 ```bash
-# Run the full test suite:
-pytest
+python -m pytest
 
 # Run with coverage:
-pytest --cov
+python -m pytest --cov
 ```
+
+**What the tests cover** (13 tests in `tests/test_pawpal.py`):
+
+- **Task basics** — completion status flips correctly; adding a task grows a pet's task count.
+- **Sorting correctness** — `sort_by_time()` returns tasks in chronological order (untimed tasks last).
+- **Filtering** — filter by completion status, and aggregate/scope tasks by pet.
+- **Recurrence logic** — completing a *daily* task queues a follow-up for the next day; a *weekly* task for +7 days; a one-off task queues nothing.
+- **Conflict detection** — duplicate preferred times are flagged; distinct times produce no warnings.
+- **Scheduling constraints** — tasks over the time budget are skipped; completed tasks are not planned; an empty pet/owner yields a safe empty plan.
 
 Sample test output:
 
 ```
 ============================= test session starts ==============================
 platform darwin -- Python 3.14.0, pytest-9.1.1, pluggy-1.6.0
-collected 7 items
+collected 13 items
 
-tests/test_pawpal.py .......                                             [100%]
+tests/test_pawpal.py .............                                       [100%]
 
-============================== 7 passed in 0.01s ===============================
+============================== 13 passed in 0.02s ==============================
 ```
+
+**Confidence level: ★★★★☆ (4/5).** The core scheduling behaviors — sorting,
+filtering, recurrence, conflict detection, and budget limits — are all covered
+by passing tests, including key edge cases (empty pets, over-budget tasks,
+same-time conflicts). One star is held back because conflict detection only
+catches exact time matches (not overlapping durations), and recurrence assumes
+the plan is generated on the task's due day, so there is room to harden the
+date/overlap handling before I'd call it production-ready.
 
 ## 📐 Smarter Scheduling
 
