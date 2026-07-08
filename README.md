@@ -47,11 +47,22 @@ pip install -r requirements.txt
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+============================================
+PawPal+ — Today's Schedule for Alex
+Pets: Biscuit, Miso
+Time budget: 90 min
+============================================
+Today's plan:
+  08:00 — Breakfast (10 min) [priority: high]
+  08:10 — Morning walk (30 min) [priority: high]
+  08:40 — Feed Miso (10 min) [priority: medium]
+  08:50 — Play/enrichment (20 min) [priority: medium]
+
+Skipped:
+  Grooming — not enough time left in budget
+
+Total time used: 70 min
+Reasoning: Scheduled 4 of 5 due task(s) by priority within a 90-minute budget; 70 min used.
 ```
 
 ## 🧪 Testing PawPal+

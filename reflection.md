@@ -2,15 +2,69 @@
 
 ## 1. System Design
 
+**Core user actions**
+
+PawPal+ is built around three core actions a pet owner should be able to perform:
+
+1. **Add a pet (and owner) profile.** The user enters basic information about themselves and their pet — owner name, pet name, species or breed, and any care preferences or constraints, such as how much time they have available each day. This profile is the foundation everything else builds on, since the app plans care around a specific pet.
+
+2. **Add a care task for the pet.** The user records something the pet needs done — a walk, feeding, medication, grooming, enrichment, and so on. Each task includes at minimum a duration and a priority, and optionally a preferred time or a recurrence pattern. These tasks are the raw material the scheduler reasons over.
+
+3. **Generate and view today's daily plan.** The user asks the app to produce a daily schedule from their task list while respecting constraints like available time and task priority. The app displays the ordered plan clearly and, ideally, explains why it chose that arrangement — for example, placing high-priority tasks first or dropping a low-priority task when time runs out. This is the app's main payoff: turning tasks and constraints into an actionable plan.
+
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+My initial design centers on four core classes plus one output object:
+
+- **Owner** — represents the app user and is the source of scheduling
+  constraints. It holds the owner's name, a daily time budget (minutes
+  available for pet care), a preferences dictionary, and the list of pets
+  they own. Its job is to manage pets and expose the constraints the
+  scheduler must respect.
+
+- **Pet** — represents the animal being cared for. It holds the pet's name,
+  species, free-text notes, and its own list of care tasks. Its
+  responsibility is to own and manage that task list (add, edit, remove).
+
+- **Task** — represents a single unit of care (walk, feeding, meds, grooming,
+  enrichment). It holds a name, duration in minutes, priority, and optional
+  preferred time, recurrence, and category. It is responsible for describing
+  itself and answering small questions about itself (its priority score,
+  whether it is due today).
+
+- **Scheduler** — the engine that turns a list of tasks plus constraints into
+  a plan. It is responsible for the core logic: sorting tasks by priority,
+  filtering out tasks that don't fit the time budget, resolving time
+  conflicts, and generating the final plan. I deliberately kept it separate
+  from Pet/Task so the scheduling logic can be unit-tested in isolation.
+
+- **DailyPlan** — the scheduler's output. It holds the scheduled tasks, the
+  skipped tasks, total time used, and a reasoning string, so the app can both
+  show the plan and explain why it made those choices.
+
+Relationships: an Owner owns many Pets, a Pet has many Tasks, and the
+Scheduler reads Tasks and produces a DailyPlan.
+
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+Yes. After reviewing the skeleton with my AI assistant, I made three changes:
+
+1. I added an `id` field to `Task`. The Pet class referenced tasks by
+   `task_id` in edit/remove, but Task had no identifier, so there was nothing
+   to look up. Adding an id makes the Pet–Task relationship actually usable.
+
+2. I tied the Scheduler to the Owner's constraints instead of storing a
+   separate time budget. Previously the Owner's `daily_time_budget` and the
+   Scheduler's `time_budget` could disagree; now the scheduler is created from
+   the owner's budget so there is a single source of truth.
+
+3. I removed `Scheduler.explain()` and moved the reasoning into
+   `DailyPlan.reasoning`, populated during `generate_plan()`. The original
+   design implied the scheduler remembered its last plan, which added hidden
+   state; letting the plan own its own explanation is simpler and keeps the
+   scheduler stateless.
+
 
 ---
 

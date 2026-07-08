@@ -1,15 +1,63 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
+    %% PawPal+ draft UML — will be refined in Phase 6 to match the final implementation.
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +int daily_time_budget
+        +dict preferences
+        +list~Pet~ pets
+        +add_pet(pet) None
+        +remove_pet(pet) None
+        +set_time_budget(minutes) None
+        +get_pets() list~Pet~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +str notes
+        +list~Task~ tasks
+        +add_task(task) None
+        +edit_task(task_id, **fields) None
+        +remove_task(task_id) None
+        +get_tasks() list~Task~
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        +int id
+        +str name
+        +int duration
+        +str priority
+        +str preferred_time
+        +str recurrence
+        +str category
+        +priority_score() int
+        +is_due_today() bool
+        +update(**fields) None
+    }
+
+    class Scheduler {
+        +int time_budget
+        +str strategy
+        +sort_tasks(tasks) list~Task~
+        +filter_by_time(tasks) list~Task~
+        +resolve_conflicts(tasks) list~Task~
+        +generate_plan(tasks) DailyPlan
+        +for_owner(owner, strategy) Scheduler
+    }
+
+    class DailyPlan {
+        +list scheduled_tasks
+        +list skipped_tasks
+        +int total_time_used
+        +str reasoning
+        +add_scheduled(task, start_time) None
+        +add_skipped(task, reason) None
+        +summary() str
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler ..> Task : reads
+    Scheduler ..> DailyPlan : produces
+    Owner ..> Scheduler : configures via budget
