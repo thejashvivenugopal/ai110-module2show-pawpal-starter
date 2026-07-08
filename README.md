@@ -22,6 +22,18 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## ✨ Features
+
+- **Owner & multi-pet management** — one owner can track several pets, each with its own task list.
+- **Care tasks** — every task has a duration, priority (high/medium/low), optional preferred time, frequency, and completion status.
+- **Priority scheduling** — tasks are ordered high-to-low priority (shorter tasks break ties) and packed greedily into the owner's daily time budget.
+- **Sort by time** — view tasks in chronological order by their preferred "HH:MM" time.
+- **Filtering** — filter tasks by completion status (pending vs. all) or scope them to a single pet.
+- **Conflict warnings** — the scheduler flags when two tasks want the same time slot and surfaces a warning (it never crashes the plan).
+- **Daily/weekly recurrence** — completing a recurring task automatically queues its next occurrence (next day or next week).
+- **Explainable plans** — every generated schedule includes reasoning (what was scheduled, what was skipped and why, and any conflicts).
+- **Streamlit UI + CLI demo** — an interactive web app (`app.py`) and a terminal demo (`main.py`), backed by an automated test suite.
+
 ## Getting started
 
 ### Setup
@@ -135,12 +147,80 @@ date/overlap handling before I'd call it production-ready.
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+Launch the interactive app with:
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+```bash
+streamlit run app.py
+```
+
+### Main UI features and available actions
+
+- **Owner panel** — set the owner's name and a daily time budget (in minutes).
+- **Pets panel** — add pets (name, species, notes); the list updates instantly.
+- **Tasks panel** — pick a pet, add tasks (title, duration, priority, optional
+  preferred time, and frequency). Tasks display sorted by time, with a
+  Pending/All filter, and a **Mark complete** control.
+- **Schedule panel** — a "Generate schedule" button produces today's plan as a
+  table, with conflict warnings, skipped tasks, and the scheduler's reasoning.
+
+### Example workflow
+
+1. **Enter owner info** — set the name to "Alex" and a daily time budget of 90 minutes.
+2. **Add a pet** — add "Biscuit" (dog). It appears under *Current pets*.
+3. **Add tasks** — add "Morning walk" (30 min, high, 08:00, daily),
+   "Breakfast" (10 min, high, 09:00), and "Grooming" (40 min, low).
+4. **Review tasks** — they display sorted by time; toggle Pending/All to filter.
+5. **Generate the schedule** — click *Generate schedule* to see today's ordered
+   plan, any conflicts, and why each task was included or skipped.
+6. **Mark a task complete** — completing the daily walk queues tomorrow's walk
+   automatically.
+
+### Key Scheduler behaviors shown
+
+- **Priority + time-budget scheduling** — high-priority tasks are placed first;
+  tasks that don't fit the budget are skipped with a reason.
+- **Sort by time** — tasks and the schedule are shown in chronological order.
+- **Conflict warnings** — two tasks at the same preferred time raise a warning.
+- **Recurrence** — completing a daily/weekly task auto-creates the next one.
+
+### Sample CLI output (`python main.py`)
+
+```
+============================================
+PawPal+ — Today's Schedule for Alex
+Pets: Biscuit, Miso
+Time budget: 90 min
+============================================
+Today's plan:
+  08:00 — Breakfast (10 min) [priority: high]
+  08:10 — Morning walk (30 min) [priority: high]
+  08:40 — Feed Miso (10 min) [priority: medium]
+  08:50 — Play/enrichment (20 min) [priority: medium]
+
+Skipped:
+  Grooming — not enough time left in budget
+
+Total time used: 70 min
+Reasoning: Scheduled 4 of 5 due task(s) by priority within a 90-minute budget; 70 min used. Time conflicts: Conflict at 09:00: Breakfast, Feed Miso.
+
+--------------------------------------------
+Tasks sorted by time:
+  08:00 — Morning walk
+  09:00 — Breakfast
+  09:00 — Feed Miso
+  17:00 — Grooming
+  18:00 — Play/enrichment
+
+Pending (not completed) tasks: 5
+Biscuit's tasks only: Grooming, Morning walk, Breakfast
+
+--------------------------------------------
+Schedule conflicts detected:
+  ⚠️  Conflict at 09:00: Breakfast, Feed Miso
+
+--------------------------------------------
+Completed 'Morning walk' (daily). Tasks: 3 -> 4
+  Next occurrence queued for: 2026-07-08
+```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->

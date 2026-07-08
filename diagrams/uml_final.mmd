@@ -1,0 +1,74 @@
+classDiagram
+    %% PawPal+ FINAL UML — matches the implementation in pawpal_system.py.
+
+    class Owner {
+        +str name
+        +int daily_time_budget
+        +dict preferences
+        +list~Pet~ pets
+        +add_pet(pet) Pet
+        +remove_pet(pet) None
+        +set_time_budget(minutes) None
+        +get_pets() list~Pet~
+        +get_all_tasks() list~Task~
+        +get_tasks_for_pet(pet_name) list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str notes
+        +list~Task~ tasks
+        +add_task(task) Task
+        +edit_task(task_id, **fields) None
+        +remove_task(task_id) None
+        +get_tasks() list~Task~
+        +mark_task_complete(task_id) Task
+    }
+
+    class Task {
+        +str name
+        +int duration
+        +str priority
+        +int id
+        +bool completed
+        +str preferred_time
+        +str recurrence
+        +str category
+        +date due_date
+        +priority_score() int
+        +is_due_today() bool
+        +mark_complete(done) None
+        +next_occurrence() Task
+        +update(**fields) None
+    }
+
+    class Scheduler {
+        +int time_budget
+        +str strategy
+        +for_owner(owner, strategy) Scheduler
+        +sort_tasks(tasks) list~Task~
+        +sort_by_time(tasks) list~Task~
+        +filter_by_time(tasks) list~Task~
+        +filter_by_status(tasks, completed) list~Task~
+        +detect_conflicts(tasks) list~str~
+        +generate_plan(tasks) DailyPlan
+        +plan_for_owner(owner) DailyPlan
+    }
+
+    class DailyPlan {
+        +list scheduled_tasks
+        +list skipped_tasks
+        +int total_time_used
+        +str reasoning
+        +add_scheduled(task, start_time) None
+        +add_skipped(task, reason) None
+        +summary() str
+    }
+
+    Owner "1" --> "*" Pet : owns
+    Pet "1" --> "*" Task : has
+    Scheduler ..> Owner : reads tasks via get_all_tasks()
+    Scheduler ..> Task : sorts / filters / detects conflicts
+    Scheduler ..> DailyPlan : produces
+    Owner ..> Scheduler : configures via budget

@@ -34,6 +34,10 @@ owner.set_time_budget(
     )
 )
 
+# One scheduler built from the owner's current budget, shared by the sections
+# below (task display + schedule generation).
+scheduler = Scheduler.for_owner(owner)
+
 st.divider()
 
 # ---------------------------------------------------------------------------
@@ -111,23 +115,58 @@ else:
             else:
                 st.error("Please enter a task title.")
 
-    # Show the selected pet's current tasks.
+    # Show the selected pet's current tasks, sorted chronologically and
+    # filtered by completion status.
     tasks = selected_pet.get_tasks()
     if tasks:
-        st.write(f"**{selected_pet.name}'s tasks:**")
-        st.table(
-            [
-                {
-                    "Task": t.name,
-                    "Duration (min)": t.duration,
-                    "Priority": t.priority,
-                    "Preferred": t.preferred_time or "—",
-                    "Frequency": t.recurrence or "one-off",
-                    "Done": "✅" if t.completed else "",
-                }
-                for t in tasks
-            ]
+        show = st.radio(
+            "Show", ["Pending", "All"], horizontal=True, key="task_filter"
         )
+        if show == "Pending":
+            tasks = scheduler.filter_by_status(tasks, completed=False)
+        tasks = scheduler.sort_by_time(tasks)
+
+        st.write(f"**{selected_pet.name}'s tasks:**")
+        if tasks:
+            st.table(
+                [
+                    {
+                        "Task": t.name,
+                        "Duration (min)": t.duration,
+                        "Priority": t.priority,
+                        "Preferred": t.preferred_time or "—",
+                        "Frequency": t.recurrence or "one-off",
+                        "Done": "✅" if t.completed else "",
+                    }
+                    for t in tasks
+                ]
+            )
+        else:
+            st.caption("No tasks match this filter.")
+
+        # Mark a task complete -> recurring tasks auto-queue their next run.
+        pending = scheduler.filter_by_status(
+            selected_pet.get_tasks(), completed=False
+        )
+        if pending:
+            done_id = st.selectbox(
+                "Mark a task complete",
+                [t.id for t in pending],
+                format_func=lambda tid: next(
+                    t.name for t in pending if t.id == tid
+                ),
+                key="complete_select",
+            )
+            if st.button("Mark complete"):
+                follow_up = selected_pet.mark_task_complete(done_id)
+                if follow_up is not None:
+                    st.success(
+                        f"Completed it — next {follow_up.recurrence} occurrence "
+                        f"queued for {follow_up.due_date}."
+                    )
+                else:
+                    st.success("Marked complete.")
+                st.rerun()
     else:
         st.caption("No tasks yet for this pet.")
 
@@ -142,10 +181,19 @@ if st.button("Generate schedule", type="primary"):
     if not owner.get_all_tasks():
         st.warning("Add at least one task before generating a schedule.")
     else:
-        scheduler = Scheduler.for_owner(owner)
         plan = scheduler.plan_for_owner(owner)
 
+        # Surface time conflicts first — a pet owner needs to see a
+        # double-booking before reading the plan itself.
+        conflicts = scheduler.detect_conflicts(owner.get_all_tasks())
+        for warning in conflicts:
+            st.warning(f"⚠️ {warning}")
+
         if plan.scheduled_tasks:
+            st.success(
+                f"Scheduled {len(plan.scheduled_tasks)} task(s) — "
+                f"{plan.total_time_used} of {owner.daily_time_budget} min used."
+            )
             st.table(
                 [
                     {
@@ -165,6 +213,5 @@ if st.button("Generate schedule", type="primary"):
             for task, reason in plan.skipped_tasks:
                 st.write(f"- {task.name} — {reason}")
 
-        st.caption(f"Total time used: {plan.total_time_used} min")
         if plan.reasoning:
             st.info(f"Why this plan: {plan.reasoning}")

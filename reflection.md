@@ -100,13 +100,41 @@ duration ranges for true overlap detection.
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+I used my AI coding assistant across every phase, but for different jobs.
+Early on it was a brainstorming partner: helping me list the core objects and
+turn them into a Mermaid UML diagram. During implementation, its agent/editing
+mode was the most effective feature — it could scaffold the class skeletons
+from the UML and later flesh out multiple methods across files at once
+(for example, adding recurrence required coordinated changes to `Task` and
+`Pet`). It was also useful for generating tests quickly and for explaining
+Python details I was unsure about, like using a `lambda` key to sort "HH:MM"
+strings and using `timedelta` to compute the next due date.
+
+The most helpful prompts were specific and grounded in my actual code — e.g.
+"based on my skeletons, how should the Scheduler retrieve all tasks from the
+Owner's pets?" and "suggest a lightweight conflict-detection strategy that
+returns a warning instead of crashing." Open-ended prompts gave generic
+answers; prompts that referenced my files gave answers I could use directly.
+
+Keeping separate chat sessions per phase helped me stay organized: the
+design conversation didn't get tangled with the testing conversation, so each
+session kept a clean, focused context and I could revisit a phase's reasoning
+without scrolling past unrelated code.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+The clearest example was `Scheduler.resolve_conflicts()`. The AI-suggested
+version resolved same-time conflicts by *mutating* the lower-priority task and
+clearing its `preferred_time`. When I ran the demo, this silently corrupted my
+data — a later "sort by time" showed a task with no time, and conflict
+detection then found nothing because the conflicting time had been erased. I
+rejected that approach: `generate_plan()` didn't even use `preferred_time` for
+placement, so the mutation was both harmful and pointless. I replaced it with a
+non-destructive `detect_conflicts()` that only *reports* conflicts as warning
+strings, and I verified the fix by re-running `main.py` and adding a unit test
+that asserts a same-time conflict is flagged. I evaluated AI suggestions by
+running the code, reading the actual output, and writing tests rather than
+trusting that plausible-looking code was correct.
 
 ---
 
@@ -114,13 +142,32 @@ duration ranges for true overlap detection.
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+I tested the core scheduling behaviors and their edge cases (13 tests total):
+task completion flipping status, adding a task growing a pet's task count,
+sort-by-time returning chronological order (with untimed tasks last), filtering
+by completion status, cross-pet task aggregation, conflict detection flagging
+duplicate times (and staying silent when there are none), the scheduler
+skipping tasks that exceed the time budget, completed tasks being excluded from
+today's plan, an empty pet/owner producing a safe empty plan, and recurrence
+creating the correct follow-up (next day for daily, +7 days for weekly, nothing
+for a one-off).
+
+These were important because they are exactly the behaviors a pet owner relies
+on: that the right tasks get scheduled in the right order, that nothing
+silently overflows the day, and that recurring care doesn't get lost after
+being completed once. Testing conflict detection and recurrence also protected
+me from regressions after I refactored the conflict logic.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+I'm fairly confident (about 4 out of 5). Every core path is covered by a
+passing test, including the edge cases most likely to break. I'm holding back
+one point because conflict detection only catches exact time matches, not
+overlapping durations, and recurrence assumes the plan is generated on the
+task's due day. If I had more time I'd test overlapping-duration conflicts
+(e.g. a 30-minute 08:00 task vs. an 08:15 task), weekly recurrence landing on a
+specific weekday, invalid inputs (negative durations, malformed times), and
+very large task lists to confirm the greedy scheduler still behaves.
 
 ---
 
@@ -128,12 +175,30 @@ duration ranges for true overlap detection.
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+I'm most satisfied with how clean the separation of concerns turned out. Keeping
+the `Scheduler` stateless and separate from `Owner`/`Pet`/`Task` made the logic
+easy to test in isolation and easy to wire into both a CLI demo and a Streamlit
+UI without changing the backend. The design-first workflow (UML → skeletons →
+logic → tests → UI) meant that by the time I reached the UI, the hard thinking
+was already done and the app "just worked."
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+If I had another iteration I'd give the scheduler a real notion of time: place
+tasks at their actual `preferred_time` (honoring the clock) instead of packing
+them sequentially from 08:00, and upgrade conflict detection to compare
+start-time-plus-duration ranges for true overlap. I'd also add a proper date
+model so weekly recurrence targets a specific weekday, and add edit/delete
+controls and persistence (saving the owner's data between sessions) in the UI.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+The biggest thing I learned is what it means to be the "lead architect" when
+working with a powerful AI. The AI is excellent at producing plausible code
+fast, but plausible is not the same as correct — the `resolve_conflicts`
+mutation looked reasonable and still corrupted my data. My job was to own the
+design decisions, run and read the actual output, and write tests that hold the
+AI's suggestions accountable. Used that way, AI made me much faster; used
+uncritically, it would have quietly introduced bugs. Keeping focused,
+file-specific prompts and separate chat sessions per phase was what let me stay
+in that driver's seat.
